@@ -1,6 +1,5 @@
 /*
  * Copyright 2017 Paranoid Android
- *			 2022 iusmac <iusico.maxim@libero.it>
  *
  * The code contained herein is licensed under the GNU General Public
  * License. You may obtain a copy of the GNU General Public License
@@ -15,7 +14,7 @@
 #include <linux/init.h>
 #include <linux/string.h>
 
-#include "pocket-judge.h"
+
 
 #include "touchscreen/FT5346/ft5346.h"
 #include "touchscreen/gt9xx_v2.4/gt9xx.h"
@@ -29,11 +28,12 @@
  * @hide
  */
 
+
 extern bool ft5346_ts_probed;
 extern bool gt9xx_ts_probed;
 
-static char pocket_judge_inpocket_state = '0';
 static bool pocket_judge_inpocket = false;
+EXPORT_SYMBOL(pocket_judge_inpocket);
 
 static void pocket_judge_update(void)
 {
@@ -44,49 +44,24 @@ static void pocket_judge_update(void)
 		gtp_ts_inpocket_set(pocket_judge_inpocket);
 }
 
-bool pocket_judge_isInPocket(void) {
-	return pocket_judge_inpocket;
-}
-
-void pocket_judge_forceDisable(void) {
-	pocket_judge_inpocket = false;
-	// SPECIAL STATE: can only be set internally (ex. by power button driver)
-	// to notify clients that "safe door" to exit pocket lock was triggered.
-	pocket_judge_inpocket_state = '2';
-	pocket_judge_update();
-}
-
 static ssize_t inpocket_show(struct device *dev, struct device_attribute *attr,
 			     char *buf)
 {
-	return sprintf(buf, "%c\n", pocket_judge_inpocket_state);
+	return sprintf(buf, "%u\n", pocket_judge_inpocket);
 }
 
 static ssize_t inpocket_store(struct device *dev, struct device_attribute *attr,
-			      const char *val, size_t size)
+			      const char *buf, size_t size)
 {
-    if (!val)
+	bool state;
+	ssize_t ret;
+
+	ret = strtobool(buf, &state);
+	if (ret)
 		return size;
 
-	switch (val[0]) {
-		case '0': // disable in-pocket
-			// Save disabled (neutral) state and return here as we're in
-			// special state.
-			if (pocket_judge_inpocket_state == '2') {
-				pocket_judge_inpocket_state = val[0];
-				return size;
-			}
-			pocket_judge_inpocket = false;
-			break;
-		case '1': // enable in-pocket
-			pocket_judge_inpocket = true;
-			break;
-		default:
-			return size;
-	}
-
-	if (pocket_judge_inpocket_state != val[0]) {
-		pocket_judge_inpocket_state = val[0];
+	if (pocket_judge_inpocket != state) {
+		pocket_judge_inpocket = state;
 		pocket_judge_update();
 	}
 
